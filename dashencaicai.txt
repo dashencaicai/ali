@@ -13,5 +13,3 @@ git config --global user.name "dashencaicai"
 
 git add -A && git commit -m "Your Message"
 
-
-git config --global alias.coa '!git add -A && git commit -m'

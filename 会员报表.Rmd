@@ -29,7 +29,16 @@ pkg <- c('plyr', 'tidyverse', 'magrittr', 'readr', 'readxl', 'tidyr',
 plyr::l_ply(pkg, require, quietly = TRUE, character.only = TRUE, .print = FALSE)
 ```
 
+<br>
+<br>
+
 # 数据
+
+<br>
+
+## 读取数据
+
+<br>
 
 读取样本数据。
 
@@ -38,7 +47,8 @@ plyr::l_ply(pkg, require, quietly = TRUE, character.only = TRUE, .print = FALSE)
 fls <- suppressWarnings(list.files('data/会员报表'))
 smp <- fls %>% llply(., function(x) {
     dtt <- x %>% str_replace_all('.xls', '') %>% ymd
-    smpp <- read_excel(paste0('data/会员报表/', x))
+    smpp <- read_excel(paste0('data/会员报表/', x)) %>% 
+      .[-nrow(.),]
     data.frame('日期' = dtt, smpp)
 }) %>% bind_rows %>% 
     as_tibble %>% 
@@ -64,7 +74,41 @@ smp %>% datatable(
                                        text = 'Download'), I('colvis'))))
 ```
 
-上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的报表数据。
+上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的会员报表数据。
+
+<br>
+<br>
+
+## 分析数据
+
+<br>
+
+```{r}
+lv_sum <- smp %>% 
+  group_by(日期, 等级) %>% 
+  group_split() %>% 
+  llply(., function(x) {
+    x1 <- x[,c(1, 3)]
+    x2 <- x[,-c(1:4)]
+    data.frame(x1[1,], '投注人数' = nrow(x), t(colSums(x2))) %>% 
+      mutate(`盈率` = 盈利 / 有效总投注)
+    }) %>% bind_rows %>% as_tibble
+
+lv_mean <- smp %>% 
+  group_by(日期, 等级) %>% 
+  group_split() %>% 
+  llply(., function(x) {
+    x1 <- x[,c(1, 3)]
+    x2 <- x[,-c(1:4)]
+    data.frame(x1[1,], '投注人数' = nrow(x), t(colMeans(x2))) %>% 
+      mutate(`盈率` = 盈利 / 有效总投注)
+    }) %>% bind_rows %>% as_tibble
+```
+
+下个章节将以：
+
+  - **等级**为标准，然后以**总额**来分析什么等级的会员为公司带来的商业效应。
+  - **等级**为标准，然后以**平均值**来分析什么等级的会员为公司带来的商业效应。
 
 <br>
 <br>
@@ -73,21 +117,17 @@ smp %>% datatable(
 
 <br>
 
-## 投注人数
+## 等级（总额）
 
-```{r warning = FALSE, eval = FALSE, results = 'asis'}
-pl1 <- smp %>% 
-  highchart() %>% 
-  hc_chart('line', hcaes(x = 日期, y = 投注人数, group = 彩种名称)) %>% 
-  hc_title(text = '用户账号') %>%
-  hc_subtitle(text = '投注人数')
+<br>
 
-tagList(pl1)
-```
+### 投注人数
 
-```{r}
+<br>
+
+```{r, eval = FALSE}
 smp %>% 
-    group_by(彩种名称) %>% 
+    group_by(等级) %>% 
     e_charts(x = 日期) %>% 
     e_line(投注人数, smooth = TRUE) %>% 
   e_datazoom(
@@ -95,176 +135,615 @@ smp %>%
     toolbox = FALSE,
     bottom = -5) %>% 
   e_tooltip() %>% 
-  e_title(text = '彩种', subtext = '投注人数', left = 'center') %>% 
+  e_title(text = '等级', subtext = '投注人数', left = 'center') %>% 
   e_axis_labels(x = '日期', y = '投注人数') %>%
   e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
   e_legend(
     orient = 'vertical', 
     type = c('scroll'), 
     #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
-    #selected = list('彩种'), 
+    #selected = list('等级'), 
     left = 0, top = 80) %>% 
   e_grid(left = 150, top = 90) %>% 
   #e_theme('shine') %>% 
   e_toolbox_feature('saveAsImage', title = '截图')
 ```
 
-上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**投注人数**，默认设置显示所有彩种，可以点击彩种筛选焦点彩种。
-
-<br>
-
-## 投注金额
-
-```{r warning = FALSE, eval = FALSE, results = 'asis'}
-smp %>% 
-    hchart('line', hcaes(x = 日期, y = 投注金额, group = 彩种名称)) %>% 
-    hc_title(text = '彩种') %>%
-    hc_subtitle(text = '投注金额')
-```
-
 ```{r}
-smp %>% 
-    group_by(彩种名称) %>% 
+lv_sum %>% 
+    group_by(等级) %>% 
     e_charts(x = 日期) %>% 
-    e_line(投注金额, smooth = TRUE) %>% 
+    e_line(投注人数, smooth = TRUE) %>% 
   e_datazoom(
     type = 'slider', 
     toolbox = FALSE,
     bottom = -5) %>% 
   e_tooltip() %>% 
-  e_title(text = '彩种', subtext = '投注金额', left = 'center') %>% 
-  e_axis_labels(x = '日期', y = '投注金额') %>%
+  e_title(text = '等级', subtext = '投注人数', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '投注人数') %>%
   e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
   e_legend(
     orient = 'vertical', 
     type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
     left = 0, top = 80) %>% 
   e_grid(left = 150, top = 90) %>% 
   #e_theme('shine') %>% 
   e_toolbox_feature('saveAsImage', title = '截图')
 ```
 
-上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**投注金额**，默认设置显示所有彩种，可以点击彩种筛选焦点彩种。
+上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**投注人数**，默认设置显示所有等级，可以点击等级筛选焦点等级。
 
 <br>
 
-## 中奖金额
+### 会员余额
 
-```{r warning = FALSE, eval = FALSE, results = 'asis'}
-smp %>% 
-    hchart('line', hcaes(x = 日期, y = 投注金额, group = 彩种名称)) %>% 
-    hc_title(text = '彩种') %>%
-    hc_subtitle(text = '中奖金额')
-```
+<br>
 
-```{r}
+```{r, eval = FALSE}
 smp %>% 
-    group_by(彩种名称) %>% 
+    group_by(等级) %>% 
     e_charts(x = 日期) %>% 
-    e_line(中奖金额, smooth = TRUE) %>% 
+    e_line(会员余额, smooth = TRUE) %>% 
   e_datazoom(
     type = 'slider', 
     toolbox = FALSE,
     bottom = -5) %>% 
   e_tooltip() %>% 
-  e_title(text = '彩种', subtext = '中奖金额', left = 'center') %>% 
-  e_axis_labels(x = '日期', y = '中奖金额') %>%
+  e_title(text = '等级', subtext = '会员余额', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '会员余额') %>%
   e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
   e_legend(
     orient = 'vertical', 
     type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
     left = 0, top = 80) %>% 
   e_grid(left = 150, top = 90) %>% 
   #e_theme('shine') %>% 
   e_toolbox_feature('saveAsImage', title = '截图')
 ```
 
-上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**中奖金额**，默认设置显示所有彩种，可以点击彩种筛选焦点彩种。
-
-<br>
-
-## 撤单金额
-
-```{r warning = FALSE, eval = FALSE, results = 'asis'}
-smp %>% 
-    hchart('line', hcaes(x = 日期, y = 投注金额, group = 彩种名称)) %>% 
-    hc_title(text = '彩种') %>%
-    hc_subtitle(text = '撤单金额')
-```
-
 ```{r}
-smp %>% 
-    group_by(彩种名称) %>% 
+lv_sum %>% 
+    group_by(等级) %>% 
     e_charts(x = 日期) %>% 
-    e_line(撤单金额, smooth = TRUE) %>% 
+    e_line(会员余额, smooth = TRUE) %>% 
   e_datazoom(
     type = 'slider', 
     toolbox = FALSE,
     bottom = -5) %>% 
   e_tooltip() %>% 
-  e_title(text = '彩种', subtext = '撤单金额', left = 'center') %>% 
-  e_axis_labels(x = '日期', y = '撤单金额') %>%
+  e_title(text = '等级', subtext = '会员余额', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '会员余额') %>%
   e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
   e_legend(
     orient = 'vertical', 
     type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
     left = 0, top = 80) %>% 
   e_grid(left = 150, top = 90) %>% 
   #e_theme('shine') %>% 
   e_toolbox_feature('saveAsImage', title = '截图')
 ```
 
-上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**撤单金额**，默认设置显示所有彩种，可以点击彩种筛选焦点彩种。
+上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**会员余额**，默认设置显示所有等级，可以点击等级筛选焦点等级。
 
 <br>
 
-## 返点金额
+### 充值金额
 
-```{r warning = FALSE, eval = FALSE, results = 'asis'}
-smp %>% 
-    hchart('line', hcaes(x = 日期, y = 投注金额, group = 彩种名称)) %>% 
-    hc_title(text = '彩种') %>%
-    hc_subtitle(text = '返点金额')
-```
+<br>
 
-```{r}
+```{r, eval = FALSE}
 smp %>% 
-    group_by(彩种名称) %>% 
+    group_by(等级) %>% 
     e_charts(x = 日期) %>% 
-    e_line(返点金额, smooth = TRUE) %>% 
+    e_line(充值金额, smooth = TRUE) %>% 
   e_datazoom(
     type = 'slider', 
     toolbox = FALSE,
     bottom = -5) %>% 
   e_tooltip() %>% 
-  e_title(text = '彩种', subtext = '返点金额', left = 'center') %>% 
-  e_axis_labels(x = '日期', y = '返点金额') %>%
+  e_title(text = '等级', subtext = '充值金额', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '充值金额') %>%
   e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
   e_legend(
     orient = 'vertical', 
     type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
     left = 0, top = 80) %>% 
   e_grid(left = 150, top = 90) %>% 
   #e_theme('shine') %>% 
   e_toolbox_feature('saveAsImage', title = '截图')
 ```
 
-上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**返点金额**，默认设置显示所有彩种，可以点击彩种筛选焦点彩种。
+```{r}
+lv_sum %>% 
+    group_by(等级) %>% 
+    e_charts(x = 日期) %>% 
+    e_line(充值金额, smooth = TRUE) %>% 
+  e_datazoom(
+    type = 'slider', 
+    toolbox = FALSE,
+    bottom = -5) %>% 
+  e_tooltip() %>% 
+  e_title(text = '等级', subtext = '充值金额', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '充值金额') %>%
+  e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
+  e_legend(
+    orient = 'vertical', 
+    type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
+    left = 0, top = 80) %>% 
+  e_grid(left = 150, top = 90) %>% 
+  #e_theme('shine') %>% 
+  e_toolbox_feature('saveAsImage', title = '截图')
+```
+
+上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**充值金额**，默认设置显示所有等级，可以点击等级筛选焦点等级。
 
 <br>
 
-## 盈利
+### 提现金额
 
-```{r warning = FALSE, eval = FALSE, results = 'asis'}
+<br>
+
+```{r, eval = FALSE}
 smp %>% 
-    hchart('line', hcaes(x = 日期, y = 投注金额, group = 彩种名称)) %>% 
-    hc_title(text = '彩种') %>%
-    hc_subtitle(text = '盈利')
+    group_by(等级) %>% 
+    e_charts(x = 日期) %>% 
+    e_line(提现金额, smooth = TRUE) %>% 
+  e_datazoom(
+    type = 'slider', 
+    toolbox = FALSE,
+    bottom = -5) %>% 
+  e_tooltip() %>% 
+  e_title(text = '等级', subtext = '提现金额', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '提现金额') %>%
+  e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
+  e_legend(
+    orient = 'vertical', 
+    type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
+    left = 0, top = 80) %>% 
+  e_grid(left = 150, top = 90) %>% 
+  #e_theme('shine') %>% 
+  e_toolbox_feature('saveAsImage', title = '截图')
 ```
 
 ```{r}
+lv_sum %>% 
+    group_by(等级) %>% 
+    e_charts(x = 日期) %>% 
+    e_line(提现金额, smooth = TRUE) %>% 
+  e_datazoom(
+    type = 'slider', 
+    toolbox = FALSE,
+    bottom = -5) %>% 
+  e_tooltip() %>% 
+  e_title(text = '等级', subtext = '提现金额', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '提现金额') %>%
+  e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
+  e_legend(
+    orient = 'vertical', 
+    type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
+    left = 0, top = 80) %>% 
+  e_grid(left = 150, top = 90) %>% 
+  #e_theme('shine') %>% 
+  e_toolbox_feature('saveAsImage', title = '截图')
+```
+
+上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**提现金额**，默认设置显示所有等级，可以点击等级筛选焦点等级。
+
+<br>
+
+### 有效总投注
+
+<br>
+
+```{r, eval = FALSE}
 smp %>% 
-    group_by(彩种名称) %>% 
+    group_by(等级) %>% 
+    e_charts(x = 日期) %>% 
+    e_line(有效总投注, smooth = TRUE) %>% 
+  e_datazoom(
+    type = 'slider', 
+    toolbox = FALSE,
+    bottom = -5) %>% 
+  e_tooltip() %>% 
+  e_title(text = '等级', subtext = '有效总投注', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '有效总投注') %>%
+  e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
+  e_legend(
+    orient = 'vertical', 
+    type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
+    left = 0, top = 80) %>% 
+  e_grid(left = 150, top = 90) %>% 
+  #e_theme('shine') %>% 
+  e_toolbox_feature('saveAsImage', title = '截图')
+```
+
+```{r}
+lv_sum %>% 
+    group_by(等级) %>% 
+    e_charts(x = 日期) %>% 
+    e_line(有效总投注, smooth = TRUE) %>% 
+  e_datazoom(
+    type = 'slider', 
+    toolbox = FALSE,
+    bottom = -5) %>% 
+  e_tooltip() %>% 
+  e_title(text = '等级', subtext = '有效总投注', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '有效总投注') %>%
+  e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
+  e_legend(
+    orient = 'vertical', 
+    type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
+    left = 0, top = 80) %>% 
+  e_grid(left = 150, top = 90) %>% 
+  #e_theme('shine') %>% 
+  e_toolbox_feature('saveAsImage', title = '截图')
+```
+
+上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**有效总投注**，默认设置显示所有等级，可以点击等级筛选焦点等级。
+
+<br>
+
+### 中奖总金额
+
+<br>
+
+```{r, eval = FALSE}
+smp %>% 
+    group_by(等级) %>% 
+    e_charts(x = 日期) %>% 
+    e_line(中奖总金额, smooth = TRUE) %>% 
+  e_datazoom(
+    type = 'slider', 
+    toolbox = FALSE,
+    bottom = -5) %>% 
+  e_tooltip() %>% 
+  e_title(text = '等级', subtext = '中奖总金额', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '中奖总金额') %>%
+  e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
+  e_legend(
+    orient = 'vertical', 
+    type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
+    left = 0, top = 80) %>% 
+  e_grid(left = 150, top = 90) %>% 
+  #e_theme('shine') %>% 
+  e_toolbox_feature('saveAsImage', title = '截图')
+```
+
+```{r}
+lv_sum %>% 
+    group_by(等级) %>% 
+    e_charts(x = 日期) %>% 
+    e_line(中奖总金额, smooth = TRUE) %>% 
+  e_datazoom(
+    type = 'slider', 
+    toolbox = FALSE,
+    bottom = -5) %>% 
+  e_tooltip() %>% 
+  e_title(text = '等级', subtext = '中奖总金额', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '中奖总金额') %>%
+  e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
+  e_legend(
+    orient = 'vertical', 
+    type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
+    left = 0, top = 80) %>% 
+  e_grid(left = 150, top = 90) %>% 
+  #e_theme('shine') %>% 
+  e_toolbox_feature('saveAsImage', title = '截图')
+```
+
+上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**中奖总金额**，默认设置显示所有等级，可以点击等级筛选焦点等级。
+
+<br>
+
+### 下级返点
+
+<br>
+
+```{r, eval = FALSE}
+smp %>% 
+    group_by(等级) %>% 
+    e_charts(x = 日期) %>% 
+    e_line(下级返点, smooth = TRUE) %>% 
+  e_datazoom(
+    type = 'slider', 
+    toolbox = FALSE,
+    bottom = -5) %>% 
+  e_tooltip() %>% 
+  e_title(text = '等级', subtext = '下级返点', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '下级返点') %>%
+  e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
+  e_legend(
+    orient = 'vertical', 
+    type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
+    left = 0, top = 80) %>% 
+  e_grid(left = 150, top = 90) %>% 
+  #e_theme('shine') %>% 
+  e_toolbox_feature('saveAsImage', title = '截图')
+```
+
+```{r}
+lv_sum %>% 
+    group_by(等级) %>% 
+    e_charts(x = 日期) %>% 
+    e_line(下级返点, smooth = TRUE) %>% 
+  e_datazoom(
+    type = 'slider', 
+    toolbox = FALSE,
+    bottom = -5) %>% 
+  e_tooltip() %>% 
+  e_title(text = '等级', subtext = '下级返点', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '下级返点') %>%
+  e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
+  e_legend(
+    orient = 'vertical', 
+    type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
+    left = 0, top = 80) %>% 
+  e_grid(left = 150, top = 90) %>% 
+  #e_theme('shine') %>% 
+  e_toolbox_feature('saveAsImage', title = '截图')
+```
+
+上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**下级返点**，默认设置显示所有等级，可以点击等级筛选焦点等级。
+
+<br>
+
+### 自身返点
+
+<br>
+
+```{r, eval = FALSE}
+smp %>% 
+    group_by(等级) %>% 
+    e_charts(x = 日期) %>% 
+    e_line(自身返点, smooth = TRUE) %>% 
+  e_datazoom(
+    type = 'slider', 
+    toolbox = FALSE,
+    bottom = -5) %>% 
+  e_tooltip() %>% 
+  e_title(text = '等级', subtext = '自身返点', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '自身返点') %>%
+  e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
+  e_legend(
+    orient = 'vertical', 
+    type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
+    left = 0, top = 80) %>% 
+  e_grid(left = 150, top = 90) %>% 
+  #e_theme('shine') %>% 
+  e_toolbox_feature('saveAsImage', title = '截图')
+```
+
+```{r}
+lv_sum %>% 
+    group_by(等级) %>% 
+    e_charts(x = 日期) %>% 
+    e_line(自身返点, smooth = TRUE) %>% 
+  e_datazoom(
+    type = 'slider', 
+    toolbox = FALSE,
+    bottom = -5) %>% 
+  e_tooltip() %>% 
+  e_title(text = '等级', subtext = '自身返点', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '自身返点') %>%
+  e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
+  e_legend(
+    orient = 'vertical', 
+    type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
+    left = 0, top = 80) %>% 
+  e_grid(left = 150, top = 90) %>% 
+  #e_theme('shine') %>% 
+  e_toolbox_feature('saveAsImage', title = '截图')
+```
+
+上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**自身返点**，默认设置显示所有等级，可以点击等级筛选焦点等级。
+
+<br>
+
+### 代理佣金
+
+<br>
+
+```{r, eval = FALSE}
+smp %>% 
+    group_by(等级) %>% 
+    e_charts(x = 日期) %>% 
+    e_line(代理佣金, smooth = TRUE) %>% 
+  e_datazoom(
+    type = 'slider', 
+    toolbox = FALSE,
+    bottom = -5) %>% 
+  e_tooltip() %>% 
+  e_title(text = '等级', subtext = '代理佣金', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '代理佣金') %>%
+  e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
+  e_legend(
+    orient = 'vertical', 
+    type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
+    left = 0, top = 80) %>% 
+  e_grid(left = 150, top = 90) %>% 
+  #e_theme('shine') %>% 
+  e_toolbox_feature('saveAsImage', title = '截图')
+```
+
+```{r}
+lv_sum %>% 
+    group_by(等级) %>% 
+    e_charts(x = 日期) %>% 
+    e_line(代理佣金, smooth = TRUE) %>% 
+  e_datazoom(
+    type = 'slider', 
+    toolbox = FALSE,
+    bottom = -5) %>% 
+  e_tooltip() %>% 
+  e_title(text = '等级', subtext = '代理佣金', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '代理佣金') %>%
+  e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
+  e_legend(
+    orient = 'vertical', 
+    type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
+    left = 0, top = 80) %>% 
+  e_grid(left = 150, top = 90) %>% 
+  #e_theme('shine') %>% 
+  e_toolbox_feature('saveAsImage', title = '截图')
+```
+
+上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**代理佣金**，默认设置显示所有等级，可以点击等级筛选焦点等级。
+
+<br>
+
+### 总活动礼金
+
+<br>
+
+```{r, eval = FALSE}
+smp %>% 
+    group_by(等级) %>% 
+    e_charts(x = 日期) %>% 
+    e_line(总活动礼金, smooth = TRUE) %>% 
+  e_datazoom(
+    type = 'slider', 
+    toolbox = FALSE,
+    bottom = -5) %>% 
+  e_tooltip() %>% 
+  e_title(text = '等级', subtext = '总活动礼金', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '总活动礼金') %>%
+  e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
+  e_legend(
+    orient = 'vertical', 
+    type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
+    left = 0, top = 80) %>% 
+  e_grid(left = 150, top = 90) %>% 
+  #e_theme('shine') %>% 
+  e_toolbox_feature('saveAsImage', title = '截图')
+```
+
+```{r}
+lv_sum %>% 
+    group_by(等级) %>% 
+    e_charts(x = 日期) %>% 
+    e_line(总活动礼金, smooth = TRUE) %>% 
+  e_datazoom(
+    type = 'slider', 
+    toolbox = FALSE,
+    bottom = -5) %>% 
+  e_tooltip() %>% 
+  e_title(text = '等级', subtext = '总活动礼金', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '总活动礼金') %>%
+  e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
+  e_legend(
+    orient = 'vertical', 
+    type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
+    left = 0, top = 80) %>% 
+  e_grid(left = 150, top = 90) %>% 
+  #e_theme('shine') %>% 
+  e_toolbox_feature('saveAsImage', title = '截图')
+```
+
+上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**总活动礼金**，默认设置显示所有等级，可以点击等级筛选焦点等级。
+
+<br>
+
+### 存款优惠
+
+<br>
+
+```{r, eval = FALSE}
+smp %>% 
+    group_by(等级) %>% 
+    e_charts(x = 日期) %>% 
+    e_line(存款优惠, smooth = TRUE) %>% 
+  e_datazoom(
+    type = 'slider', 
+    toolbox = FALSE,
+    bottom = -5) %>% 
+  e_tooltip() %>% 
+  e_title(text = '等级', subtext = '存款优惠', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '存款优惠') %>%
+  e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
+  e_legend(
+    orient = 'vertical', 
+    type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
+    left = 0, top = 80) %>% 
+  e_grid(left = 150, top = 90) %>% 
+  #e_theme('shine') %>% 
+  e_toolbox_feature('saveAsImage', title = '截图')
+```
+
+```{r}
+lv_sum %>% 
+    group_by(等级) %>% 
+    e_charts(x = 日期) %>% 
+    e_line(存款优惠, smooth = TRUE) %>% 
+  e_datazoom(
+    type = 'slider', 
+    toolbox = FALSE,
+    bottom = -5) %>% 
+  e_tooltip() %>% 
+  e_title(text = '等级', subtext = '存款优惠', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '存款优惠') %>%
+  e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
+  e_legend(
+    orient = 'vertical', 
+    type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
+    left = 0, top = 80) %>% 
+  e_grid(left = 150, top = 90) %>% 
+  #e_theme('shine') %>% 
+  e_toolbox_feature('saveAsImage', title = '截图')
+```
+
+上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**存款优惠**，默认设置显示所有等级，可以点击等级筛选焦点等级。
+
+<br>
+
+### 盈利
+
+<br>
+
+```{r, eval = FALSE}
+smp %>% 
+    group_by(等级) %>% 
     e_charts(x = 日期) %>% 
     e_line(盈利, smooth = TRUE) %>% 
   e_datazoom(
@@ -272,34 +751,55 @@ smp %>%
     toolbox = FALSE,
     bottom = -5) %>% 
   e_tooltip() %>% 
-  e_title(text = '彩种', subtext = '盈利', left = 'center') %>% 
+  e_title(text = '等级', subtext = '盈利', left = 'center') %>% 
   e_axis_labels(x = '日期', y = '盈利') %>%
   e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
   e_legend(
     orient = 'vertical', 
     type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
     left = 0, top = 80) %>% 
   e_grid(left = 150, top = 90) %>% 
   #e_theme('shine') %>% 
   e_toolbox_feature('saveAsImage', title = '截图')
 ```
 
-上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**盈利**，默认设置显示所有彩种，可以点击彩种筛选焦点彩种。
+```{r}
+lv_sum %>% 
+    group_by(等级) %>% 
+    e_charts(x = 日期) %>% 
+    e_line(盈利, smooth = TRUE) %>% 
+  e_datazoom(
+    type = 'slider', 
+    toolbox = FALSE,
+    bottom = -5) %>% 
+  e_tooltip() %>% 
+  e_title(text = '等级', subtext = '盈利', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '盈利') %>%
+  e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
+  e_legend(
+    orient = 'vertical', 
+    type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
+    left = 0, top = 80) %>% 
+  e_grid(left = 150, top = 90) %>% 
+  #e_theme('shine') %>% 
+  e_toolbox_feature('saveAsImage', title = '截图')
+```
+
+上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**盈利**，默认设置显示所有等级，可以点击等级筛选焦点等级。
 
 <br>
 
-## 盈率
+### 盈率
 
-```{r warning = FALSE, eval = FALSE, results = 'asis'}
-smp %>% 
-    hchart('line', hcaes(x = 日期, y = 投注金额, group = 彩种名称)) %>% 
-    hc_title(text = '彩种') %>%
-    hc_subtitle(text = '盈率')
-```
+<br>
 
-```{r}
+```{r, eval = FALSE}
 smp %>% 
-    group_by(彩种名称) %>% 
+    group_by(等级) %>% 
     e_charts(x = 日期) %>% 
     e_line(盈率, smooth = TRUE) %>% 
   e_datazoom(
@@ -307,19 +807,468 @@ smp %>%
     toolbox = FALSE,
     bottom = -5) %>% 
   e_tooltip() %>% 
-  e_title(text = '彩种', subtext = '盈率', left = 'center') %>% 
+  e_title(text = '等级', subtext = '盈率', left = 'center') %>% 
   e_axis_labels(x = '日期', y = '盈率') %>%
   e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
   e_legend(
     orient = 'vertical', 
     type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
     left = 0, top = 80) %>% 
   e_grid(left = 150, top = 90) %>% 
   #e_theme('shine') %>% 
   e_toolbox_feature('saveAsImage', title = '截图')
 ```
 
-上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**盈率**，默认设置显示所有彩种，可以点击彩种筛选焦点彩种。
+```{r}
+lv_sum %>% 
+    group_by(等级) %>% 
+    e_charts(x = 日期) %>% 
+    e_line(盈率, smooth = TRUE) %>% 
+  e_datazoom(
+    type = 'slider', 
+    toolbox = FALSE,
+    bottom = -5) %>% 
+  e_tooltip() %>% 
+  e_title(text = '等级', subtext = '盈率', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '盈率') %>%
+  e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
+  e_legend(
+    orient = 'vertical', 
+    type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
+    left = 0, top = 80) %>% 
+  e_grid(left = 150, top = 90) %>% 
+  #e_theme('shine') %>% 
+  e_toolbox_feature('saveAsImage', title = '截图')
+```
+
+上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**盈率**，默认设置显示所有等级，可以点击等级筛选焦点等级。
+
+<br>
+
+
+<br>
+
+## 等级（平均值）
+
+<br>
+
+### 投注人数
+
+<br>
+
+```{r}
+lv_mean %>% 
+    group_by(等级) %>% 
+    e_charts(x = 日期) %>% 
+    e_line(投注人数, smooth = TRUE) %>% 
+  e_datazoom(
+    type = 'slider', 
+    toolbox = FALSE,
+    bottom = -5) %>% 
+  e_tooltip() %>% 
+  e_title(text = '等级', subtext = '投注人数', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '投注人数') %>%
+  e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
+  e_legend(
+    orient = 'vertical', 
+    type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
+    left = 0, top = 80) %>% 
+  e_grid(left = 150, top = 90) %>% 
+  #e_theme('shine') %>% 
+  e_toolbox_feature('saveAsImage', title = '截图')
+```
+
+上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**投注人数**，默认设置显示所有等级，可以点击等级筛选焦点等级。
+
+<br>
+
+### 会员余额
+
+<br>
+
+```{r}
+lv_mean %>% 
+    group_by(等级) %>% 
+    e_charts(x = 日期) %>% 
+    e_line(会员余额, smooth = TRUE) %>% 
+  e_datazoom(
+    type = 'slider', 
+    toolbox = FALSE,
+    bottom = -5) %>% 
+  e_tooltip() %>% 
+  e_title(text = '等级', subtext = '会员余额', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '会员余额') %>%
+  e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
+  e_legend(
+    orient = 'vertical', 
+    type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
+    left = 0, top = 80) %>% 
+  e_grid(left = 150, top = 90) %>% 
+  #e_theme('shine') %>% 
+  e_toolbox_feature('saveAsImage', title = '截图')
+```
+
+上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**会员余额**，默认设置显示所有等级，可以点击等级筛选焦点等级。
+
+<br>
+
+### 充值金额
+
+<br>
+
+```{r}
+lv_mean %>% 
+    group_by(等级) %>% 
+    e_charts(x = 日期) %>% 
+    e_line(充值金额, smooth = TRUE) %>% 
+  e_datazoom(
+    type = 'slider', 
+    toolbox = FALSE,
+    bottom = -5) %>% 
+  e_tooltip() %>% 
+  e_title(text = '等级', subtext = '充值金额', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '充值金额') %>%
+  e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
+  e_legend(
+    orient = 'vertical', 
+    type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
+    left = 0, top = 80) %>% 
+  e_grid(left = 150, top = 90) %>% 
+  #e_theme('shine') %>% 
+  e_toolbox_feature('saveAsImage', title = '截图')
+```
+
+上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**充值金额**，默认设置显示所有等级，可以点击等级筛选焦点等级。
+
+<br>
+
+### 提现金额
+
+<br>
+
+```{r}
+lv_mean %>% 
+    group_by(等级) %>% 
+    e_charts(x = 日期) %>% 
+    e_line(提现金额, smooth = TRUE) %>% 
+  e_datazoom(
+    type = 'slider', 
+    toolbox = FALSE,
+    bottom = -5) %>% 
+  e_tooltip() %>% 
+  e_title(text = '等级', subtext = '提现金额', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '提现金额') %>%
+  e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
+  e_legend(
+    orient = 'vertical', 
+    type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
+    left = 0, top = 80) %>% 
+  e_grid(left = 150, top = 90) %>% 
+  #e_theme('shine') %>% 
+  e_toolbox_feature('saveAsImage', title = '截图')
+```
+
+上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**提现金额**，默认设置显示所有等级，可以点击等级筛选焦点等级。
+
+<br>
+
+### 有效总投注
+
+<br>
+
+```{r}
+lv_mean %>% 
+    group_by(等级) %>% 
+    e_charts(x = 日期) %>% 
+    e_line(有效总投注, smooth = TRUE) %>% 
+  e_datazoom(
+    type = 'slider', 
+    toolbox = FALSE,
+    bottom = -5) %>% 
+  e_tooltip() %>% 
+  e_title(text = '等级', subtext = '有效总投注', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '有效总投注') %>%
+  e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
+  e_legend(
+    orient = 'vertical', 
+    type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
+    left = 0, top = 80) %>% 
+  e_grid(left = 150, top = 90) %>% 
+  #e_theme('shine') %>% 
+  e_toolbox_feature('saveAsImage', title = '截图')
+```
+
+上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**有效总投注**，默认设置显示所有等级，可以点击等级筛选焦点等级。
+
+<br>
+
+### 中奖总金额
+
+<br>
+
+```{r}
+lv_mean %>% 
+    group_by(等级) %>% 
+    e_charts(x = 日期) %>% 
+    e_line(中奖总金额, smooth = TRUE) %>% 
+  e_datazoom(
+    type = 'slider', 
+    toolbox = FALSE,
+    bottom = -5) %>% 
+  e_tooltip() %>% 
+  e_title(text = '等级', subtext = '中奖总金额', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '中奖总金额') %>%
+  e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
+  e_legend(
+    orient = 'vertical', 
+    type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
+    left = 0, top = 80) %>% 
+  e_grid(left = 150, top = 90) %>% 
+  #e_theme('shine') %>% 
+  e_toolbox_feature('saveAsImage', title = '截图')
+```
+
+上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**中奖总金额**，默认设置显示所有等级，可以点击等级筛选焦点等级。
+
+<br>
+
+### 下级返点
+
+<br>
+
+```{r}
+lv_mean %>% 
+    group_by(等级) %>% 
+    e_charts(x = 日期) %>% 
+    e_line(下级返点, smooth = TRUE) %>% 
+  e_datazoom(
+    type = 'slider', 
+    toolbox = FALSE,
+    bottom = -5) %>% 
+  e_tooltip() %>% 
+  e_title(text = '等级', subtext = '下级返点', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '下级返点') %>%
+  e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
+  e_legend(
+    orient = 'vertical', 
+    type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
+    left = 0, top = 80) %>% 
+  e_grid(left = 150, top = 90) %>% 
+  #e_theme('shine') %>% 
+  e_toolbox_feature('saveAsImage', title = '截图')
+```
+
+上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**下级返点**，默认设置显示所有等级，可以点击等级筛选焦点等级。
+
+<br>
+
+### 自身返点
+
+<br>
+
+```{r}
+lv_mean %>% 
+    group_by(等级) %>% 
+    e_charts(x = 日期) %>% 
+    e_line(自身返点, smooth = TRUE) %>% 
+  e_datazoom(
+    type = 'slider', 
+    toolbox = FALSE,
+    bottom = -5) %>% 
+  e_tooltip() %>% 
+  e_title(text = '等级', subtext = '自身返点', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '自身返点') %>%
+  e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
+  e_legend(
+    orient = 'vertical', 
+    type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
+    left = 0, top = 80) %>% 
+  e_grid(left = 150, top = 90) %>% 
+  #e_theme('shine') %>% 
+  e_toolbox_feature('saveAsImage', title = '截图')
+```
+
+上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**自身返点**，默认设置显示所有等级，可以点击等级筛选焦点等级。
+
+<br>
+
+### 代理佣金
+
+<br>
+
+```{r}
+lv_mean %>% 
+    group_by(等级) %>% 
+    e_charts(x = 日期) %>% 
+    e_line(代理佣金, smooth = TRUE) %>% 
+  e_datazoom(
+    type = 'slider', 
+    toolbox = FALSE,
+    bottom = -5) %>% 
+  e_tooltip() %>% 
+  e_title(text = '等级', subtext = '代理佣金', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '代理佣金') %>%
+  e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
+  e_legend(
+    orient = 'vertical', 
+    type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
+    left = 0, top = 80) %>% 
+  e_grid(left = 150, top = 90) %>% 
+  #e_theme('shine') %>% 
+  e_toolbox_feature('saveAsImage', title = '截图')
+```
+
+上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**代理佣金**，默认设置显示所有等级，可以点击等级筛选焦点等级。
+
+<br>
+
+### 总活动礼金
+
+<br>
+
+```{r}
+lv_mean %>% 
+    group_by(等级) %>% 
+    e_charts(x = 日期) %>% 
+    e_line(总活动礼金, smooth = TRUE) %>% 
+  e_datazoom(
+    type = 'slider', 
+    toolbox = FALSE,
+    bottom = -5) %>% 
+  e_tooltip() %>% 
+  e_title(text = '等级', subtext = '总活动礼金', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '总活动礼金') %>%
+  e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
+  e_legend(
+    orient = 'vertical', 
+    type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
+    left = 0, top = 80) %>% 
+  e_grid(left = 150, top = 90) %>% 
+  #e_theme('shine') %>% 
+  e_toolbox_feature('saveAsImage', title = '截图')
+```
+
+上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**总活动礼金**，默认设置显示所有等级，可以点击等级筛选焦点等级。
+
+<br>
+
+### 存款优惠
+
+<br>
+
+```{r}
+lv_mean %>% 
+    group_by(等级) %>% 
+    e_charts(x = 日期) %>% 
+    e_line(存款优惠, smooth = TRUE) %>% 
+  e_datazoom(
+    type = 'slider', 
+    toolbox = FALSE,
+    bottom = -5) %>% 
+  e_tooltip() %>% 
+  e_title(text = '等级', subtext = '存款优惠', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '存款优惠') %>%
+  e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
+  e_legend(
+    orient = 'vertical', 
+    type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
+    left = 0, top = 80) %>% 
+  e_grid(left = 150, top = 90) %>% 
+  #e_theme('shine') %>% 
+  e_toolbox_feature('saveAsImage', title = '截图')
+```
+
+上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**存款优惠**，默认设置显示所有等级，可以点击等级筛选焦点等级。
+
+<br>
+
+### 盈利
+
+<br>
+
+```{r}
+lv_mean %>% 
+    group_by(等级) %>% 
+    e_charts(x = 日期) %>% 
+    e_line(盈利, smooth = TRUE) %>% 
+  e_datazoom(
+    type = 'slider', 
+    toolbox = FALSE,
+    bottom = -5) %>% 
+  e_tooltip() %>% 
+  e_title(text = '等级', subtext = '盈利', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '盈利') %>%
+  e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
+  e_legend(
+    orient = 'vertical', 
+    type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
+    left = 0, top = 80) %>% 
+  e_grid(left = 150, top = 90) %>% 
+  #e_theme('shine') %>% 
+  e_toolbox_feature('saveAsImage', title = '截图')
+```
+
+上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**盈利**，默认设置显示所有等级，可以点击等级筛选焦点等级。
+
+<br>
+
+### 盈率
+
+<br>
+
+```{r}
+lv_mean %>% 
+    group_by(等级) %>% 
+    e_charts(x = 日期) %>% 
+    e_line(盈率, smooth = TRUE) %>% 
+  e_datazoom(
+    type = 'slider', 
+    toolbox = FALSE,
+    bottom = -5) %>% 
+  e_tooltip() %>% 
+  e_title(text = '等级', subtext = '盈率', left = 'center') %>% 
+  e_axis_labels(x = '日期', y = '盈率') %>%
+  e_x_axis(日期, axisPointer = list(show = TRUE)) %>% 
+  e_legend(
+    orient = 'vertical', 
+    type = c('scroll'), 
+    #selectedMode = 'multiple', #https://echarts.apache.org/en/option.html#legend
+    #selected = list('等级'), 
+    left = 0, top = 80) %>% 
+  e_grid(left = 150, top = 90) %>% 
+  #e_theme('shine') %>% 
+  e_toolbox_feature('saveAsImage', title = '截图')
+```
+
+上图显示从`r smp$'日期' %>% range %>% .[1]`到`r smp$'日期' %>% range %>% .[2]`的**盈率**，默认设置显示所有等级，可以点击等级筛选焦点等级。
 
 <br>
 <br>
@@ -330,11 +1279,15 @@ smp %>%
 
 ## 总结
 
+<br>
+
 以上是将数据绘图，还需要通过统计模型预测，不过基于数据观测值太少^[[binary.com Interview Question I (Extention)](https://rpubs.com/englianhu/binary-Q1E)尝试分别使用`3个月`、`6个月`、`12个月`、`18个月`和`24个月`的数据，结果`12个月`的数据最为精准。]，所以暂时没有预测。
 
 <br>
 
 ## 附录
+
+<br>
 
 ```{r warning = FALSE, results = 'asis'}
 suppressMessages(require('dplyr', quietly = TRUE))

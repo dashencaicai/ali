@@ -29,7 +29,12 @@ pkg <- c('plyr', 'tidyverse', 'magrittr', 'readr', 'readxl', 'tidyr',
 plyr::l_ply(pkg, require, quietly = TRUE, character.only = TRUE, .print = FALSE)
 ```
 
+<br>
+<br>
+
 # 数据
+
+<br>
 
 读取样本数据。
 
@@ -73,6 +78,8 @@ smp %>% datatable(
 
 ## 投注人数
 
+<br>
+
 ```{r warning = FALSE, eval = FALSE, results = 'asis'}
 pl1 <- smp %>% 
   highchart() %>% 
@@ -113,6 +120,8 @@ smp %>%
 
 ## 投注金额
 
+<br>
+
 ```{r warning = FALSE, eval = FALSE, results = 'asis'}
 smp %>% 
     hchart('line', hcaes(x = 日期, y = 投注金额, group = 彩种名称)) %>% 
@@ -147,6 +156,8 @@ smp %>%
 <br>
 
 ## 中奖金额
+
+<br>
 
 ```{r warning = FALSE, eval = FALSE, results = 'asis'}
 smp %>% 
@@ -183,6 +194,8 @@ smp %>%
 
 ## 撤单金额
 
+<br>
+
 ```{r warning = FALSE, eval = FALSE, results = 'asis'}
 smp %>% 
     hchart('line', hcaes(x = 日期, y = 投注金额, group = 彩种名称)) %>% 
@@ -217,6 +230,8 @@ smp %>%
 <br>
 
 ## 返点金额
+
+<br>
 
 ```{r warning = FALSE, eval = FALSE, results = 'asis'}
 smp %>% 
@@ -253,6 +268,8 @@ smp %>%
 
 ## 盈利
 
+<br>
+
 ```{r warning = FALSE, eval = FALSE, results = 'asis'}
 smp %>% 
     hchart('line', hcaes(x = 日期, y = 投注金额, group = 彩种名称)) %>% 
@@ -287,6 +304,8 @@ smp %>%
 <br>
 
 ## 盈率
+
+<br>
 
 ```{r warning = FALSE, eval = FALSE, results = 'asis'}
 smp %>% 
@@ -328,11 +347,15 @@ smp %>%
 
 ## 总结
 
+<br>
+
 以上是将数据绘图，还需要通过统计模型预测，不过基于数据观测值太少^[[binary.com Interview Question I (Extention)](https://rpubs.com/englianhu/binary-Q1E)尝试分别使用`3个月`、`6个月`、`12个月`、`18个月`和`24个月`的数据，结果`12个月`的数据最为精准。]，所以暂时没有预测。
 
 <br>
 
 ## 附录
+
+<br>
 
 ```{r warning = FALSE, results = 'asis'}
 suppressMessages(require('dplyr', quietly = TRUE))
